@@ -87,6 +87,7 @@ func main() {
 		key = k
 	}
 
+	// $ ./go-shadowsocks2 -c 'ss://DUMMY:qwer02..@imlgw.top:8488' -verbose -socks :1080 -u
 	if flags.Client != "" { // client mode
 		addr := flags.Client
 		cipher := flags.Cipher
@@ -152,6 +153,8 @@ func main() {
 		var err error
 
 		if strings.HasPrefix(addr, "ss://") {
+			// ss://AEAD_CHACHA20_POLY1305:your-password@:8488
+			// addr = :8488
 			addr, cipher, password, err = parseURL(addr)
 			if err != nil {
 				log.Fatal(err)

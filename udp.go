@@ -80,7 +80,7 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 		logf("UDP server address error: %v", err)
 		return
 	}
-
+	// 绑定本地 udp 1080端口
 	c, err := net.ListenPacket("udp", laddr)
 	if err != nil {
 		logf("UDP local listen error: %v", err)
@@ -100,6 +100,7 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 
 		pc := nm.Get(raddr.String())
 		if pc == nil {
+			// 本地local-socks启动一个新的udp客户端，用于中转udp请求
 			pc, err = net.ListenPacket("udp", "")
 			if err != nil {
 				logf("UDP local listen error: %v", err)
@@ -109,7 +110,7 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 			pc = shadow(pc)
 			nm.Add(raddr, c, pc, socksClient)
 		}
-
+		// 转发 udp 请求到 remote-socks 8488(udp)
 		_, err = pc.WriteTo(buf[3:n], srvAddr)
 		if err != nil {
 			logf("UDP local write error: %v", err)
@@ -120,6 +121,7 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 
 // Listen on addr for encrypted packets and basically do UDP NAT.
 func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
+	// 绑定 udp 8488 端口
 	c, err := net.ListenPacket("udp", addr)
 	if err != nil {
 		logf("UDP remote listen error: %v", err)
@@ -155,6 +157,7 @@ func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
 
 		pc := nm.Get(raddr.String())
 		if pc == nil {
+			// 远程remote-socks启动一个新的udp客户端，用于中转udp请求到真正的目标服务
 			pc, err = net.ListenPacket("udp", "")
 			if err != nil {
 				logf("UDP remote listen error: %v", err)
