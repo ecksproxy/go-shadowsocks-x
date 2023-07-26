@@ -181,14 +181,18 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 		return nil, err
 	}
 	// write VER METHOD
+	// socks5 and NO AUTHENTICATION REQUIRED
 	if _, err := rw.Write([]byte{5, 0}); err != nil {
 		return nil, err
 	}
+
+	// 开始请求，读取客户端socks请求信息
 	// read VER CMD RSV ATYP DST.ADDR DST.PORT
 	if _, err := io.ReadFull(rw, buf[:3]); err != nil {
 		return nil, err
 	}
 	cmd := buf[1]
+	// 根据 ATYP 读取目标服务器地址和端口
 	addr, err := readAddr(rw, buf)
 	if err != nil {
 		return nil, err
@@ -201,6 +205,7 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 			return nil, ErrCommandNotSupported
 		}
 		listenAddr := ParseAddr(rw.(net.Conn).LocalAddr().String())
+		// listenAddr带了atyp
 		_, err = rw.Write(append([]byte{5, 0, 0}, listenAddr...)) // SOCKS v5, reply succeeded
 		if err != nil {
 			return nil, ErrCommandNotSupported

@@ -92,6 +92,7 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 	buf := make([]byte, udpBufSize)
 
 	for {
+		// raddr是本机发起 udp 请求的地址
 		n, raddr, err := c.ReadFrom(buf)
 		if err != nil {
 			logf("UDP local read error: %v", err)
@@ -135,6 +136,7 @@ func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
 
 	logf("listening UDP on %s", addr)
 	for {
+		// raddr: ss-local
 		n, raddr, err := c.ReadFrom(buf)
 		if err != nil {
 			logf("UDP remote read error: %v", err)
@@ -167,6 +169,7 @@ func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
 			nm.Add(raddr, c, pc, remoteServer)
 		}
 
+		// 发送到真正的目标地址
 		_, err = pc.WriteTo(payload, tgtUDPAddr) // accept only UDPAddr despite the signature
 		if err != nil {
 			logf("UDP remote write error: %v", err)
@@ -228,7 +231,9 @@ func (m *natmap) Add(peer net.Addr, dst, src net.PacketConn, role mode) {
 // copy from src to dst at target with read timeout
 func timedCopy(dst net.PacketConn, target net.Addr, src net.PacketConn, timeout time.Duration, role mode) error {
 	buf := make([]byte, udpBufSize)
-
+	// dst: ss-remote和ss-local之间的 udp 连接（加密） / ss-local和本机发起请求地址之间的udp连接（未加密socks5协议）
+	// target: ss-local的地址 / 发起请求的原地址
+	// src: ss-remote和target之间的udp连接（未加密socks5协议） / ss-local和ss-remote之间的udp连接（加密）
 	for {
 		src.SetReadDeadline(time.Now().Add(timeout))
 		n, raddr, err := src.ReadFrom(buf)

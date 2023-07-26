@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	httpproxy "github.com/shadowsocks/go-shadowsocks2/http"
 	"io"
 	"io/ioutil"
 	"net"
@@ -17,6 +18,12 @@ import (
 func socksLocal(addr, server string, shadow func(net.Conn) net.Conn) {
 	logf("SOCKS proxy %s <-> %s", addr, server)
 	tcpLocal(addr, server, shadow, func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) })
+}
+
+// Create http(s) proxy listening on addr and proxy to server
+func httpLocal(addr, server string, shadow func(net.Conn) net.Conn) {
+	logf("http proxy %s <-> %s", addr, server)
+	tcpLocal(addr, server, shadow, func(c net.Conn) (socks.Addr, error) { return httpproxy.Handshake(c) })
 }
 
 // Create a TCP tunnel from addr to target via server.
@@ -39,6 +46,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 	}
 
 	for {
+		// app发起的socks请求
 		c, err := l.Accept()
 		if err != nil {
 			logf("failed to accept: %s", err)
@@ -47,11 +55,14 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 		go func() {
 			defer c.Close()
+			// socks握手并且读取目标地址
 			tgt, err := getAddr(c)
+
 			if err != nil {
 
 				// UDP: keep the connection until disconnect then free the UDP socket
 				if err == socks.InfoUDPAssociate {
+					// UDP socks握手请求
 					buf := make([]byte, 1)
 					// block here
 					for {
@@ -78,13 +89,14 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				rc = timedCork(rc, 10*time.Millisecond, 1280)
 			}
 			rc = shadow(rc)
-
+			// 将目标地址发送到socks-remote(加密)
 			if _, err = rc.Write(tgt); err != nil {
 				logf("failed to send target address: %v", err)
 				return
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
+			// 开始中转
 			if err = relay(rc, c); err != nil {
 				logf("relay error: %v", err)
 			}
@@ -113,8 +125,9 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			if config.TCPCork {
 				c = timedCork(c, 10*time.Millisecond, 1280)
 			}
+			// encrypt ss-local和ss-remote之间的连接
 			sc := shadow(c)
-
+			// decrypt 后读取 socks 目标地址
 			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
 				logf("failed to get target address from %v: %v", c.RemoteAddr(), err)
@@ -127,6 +140,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 				return
 			}
 
+			// 建立与目标地址之间的连接rc
 			rc, err := net.Dial("tcp", tgt.String())
 			if err != nil {
 				logf("failed to connect to target: %v", err)
@@ -135,6 +149,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			defer rc.Close()
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
+			// ss-remote 开始在 ss-local 和目标 tgt 之间中转数据
 			if err = relay(sc, rc); err != nil {
 				logf("relay error: %v", err)
 			}
