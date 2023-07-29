@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	httpproxy "github.com/shadowsocks/go-shadowsocks2/http"
 	"io"
 	"io/ioutil"
@@ -57,7 +58,8 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			defer c.Close()
 			// socks握手并且读取目标地址
 			tgt, err := getAddr(c)
-
+			fmt.Println("tgt", tgt)
+			fmt.Println("err", err)
 			if err != nil {
 
 				// UDP: keep the connection until disconnect then free the UDP socket

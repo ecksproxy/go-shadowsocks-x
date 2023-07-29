@@ -1,3 +1,7 @@
+# go-shadowsocks-x
+- [x] http(s) 代理
+- [ ] client tun模式
+
 # go-shadowsocks2
 
 A fresh implementation of Shadowsocks in Go.
